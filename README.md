@@ -1,6 +1,11 @@
 <h1> GraphMAE: Self-Supervised Masked Graph Autoencoders </h1>
 
-Implementation for KDD22 paper:  [*GraphMAE: Self-Supervised Masked Graph Autoencoders*](https://arxiv.org/abs/2205.10803).
+<p>
+  <img src="fig.png" width="1000">
+  <br />
+</p>
+
+Implementation for KDD'22 paper:  [GraphMAE: Self-Supervised Masked Graph Autoencoders](https://arxiv.org/abs/2205.10803).
 
 <h2>Dependencies </h2>
 
@@ -61,4 +66,4 @@ Please refer to codes in `./chem` for *molecular property prediction*.
 
 <h2> Datasets </h2>
 
-Datasets used in node classification and graph classification will be downloaded automatically from https://www.dgl.ai/ when running the code. 
+Datasets used in node classification and graph classification will be downloaded automatically from https://www.dgl.ai/ when running the code.
