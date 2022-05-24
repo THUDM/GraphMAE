@@ -1,6 +1,6 @@
 <h1> GraphMAE: Self-Supervised Masked Graph Autoencoders </h1>
 
-Implementation for paper:  *GraphMAE: Self-Supervised Masked Graph Autoencoders*. The paper is to be released. 
+Implementation for KDD22 paper:  [*GraphMAE: Self-Supervised Masked Graph Autoencoders*](https://arxiv.org/abs/2205.10803).
 
 <h2>Dependencies </h2>
 
