@@ -9,6 +9,8 @@
 
 Implementation for KDD'22 paper:  [GraphMAE: Self-Supervised Masked Graph Autoencoders](https://arxiv.org/abs/2205.10803).
 
+We also have a [Chinese blog](https://zhuanlan.zhihu.com/p/520389049) about GraphMAE on Zhihu (知乎).
+
 GraphMAE is a generative self-supervised graph learning method, which achieves competitive or better performance than existing contrastive methods on tasks including *node classification*, *graph classification*, and *molecular property prediction*.
 
 <p>
@@ -101,12 +103,25 @@ Graph classification (Accuracy, %)
 
 Transfer learning on molecular property prediction (ROC-AUC, %): 
 
-|                    | BBBP         | Tox21    | ToxCast      | SIDER        | ClinTox      | MUV      | HIV          | BACE         | Avg.     |
-| ------------------ | ------------ | -------- | ------------ | ------------ | ------------ | -------- | ------------ | ------------ | -------- |
-| AttrMasking        | 64.3±2.8     | 76.7±0.4 | **64.2±0.5** | 61.0±0.7     | 71.8±4.1     | 74.7±1.4 | 77.2±1.1     | 79.3±1.6     | 71.1     |
-| GraphCL            | 69.7±0.7     | 73.9±0.7 | 62.4±0.6     | 60.5±0.9     | 76.0±2.7     | 69.8±2.7 | **78.5±1.2** | 75.4±1.4     | 70.8     |
-| GraphLoG           | **72.5±0.8** | 75.7±0.5 | 63.5±0.7     | **61.2±1.1** | 76.7±3.3     | 76.0±1.1 | 77.8±0.8     | **83.5±1.2** | 73.4     |
-| **GraphMAE(ours)** | 72.0±0.6     | 75.5±0.6 | 64.1±0.3     | 60.3±1.1     | **82.3±1.2** | 76.3±2.4 | 77.2±1.0     | 83.1±0.9     | **73.8** |
+|                    | BBBP         | Tox21        | ToxCast      | SIDER        | ClinTox      | MUV          | HIV          | BACE         | Avg.     |
+| ------------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | -------- |
+| AttrMasking        | 64.3±2.8     | **76.7±0.4** | **64.2±0.5** | 61.0±0.7     | 71.8±4.1     | 74.7±1.4     | 77.2±1.1     | 79.3±1.6     | 71.1     |
+| GraphCL            | 69.7±0.7     | 73.9±0.7     | 62.4±0.6     | 60.5±0.9     | 76.0±2.7     | 69.8±2.7     | **78.5±1.2** | 75.4±1.4     | 70.8     |
+| GraphLoG           | **72.5±0.8** | 75.7±0.5     | 63.5±0.7     | **61.2±1.1** | 76.7±3.3     | 76.0±1.1     | 77.8±0.8     | **83.5±1.2** | 73.4     |
+| **GraphMAE(ours)** | 72.0±0.6     | 75.5±0.6     | 64.1±0.3     | 60.3±1.1     | **82.3±1.2** | **76.3±2.4** | 77.2±1.0     | 83.1±0.9     | **73.8** |
+
+<h1> Citing </h1>
+
+If you find this work is helpful to your research, please consider citing our paper:
+
+```
+@article{hou2022graphmae,
+  title={GraphMAE: Self-Supervised Masked Graph Autoencoders},
+  author={Hou, Zhenyu and Liu, Xiao and Dong, Yuxiao and Wang, Chunjie and Tang, Jie and others},
+  journal={arXiv preprint arXiv:2205.10803},
+  year={2022}
+}
+```
 
 
 
