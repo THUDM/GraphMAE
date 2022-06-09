@@ -117,8 +117,9 @@ If you find this work is helpful to your research, please consider citing our pa
 ```
 @article{hou2022graphmae,
   title={GraphMAE: Self-Supervised Masked Graph Autoencoders},
-  author={Hou, Zhenyu and Liu, Xiao and Dong, Yuxiao and Wang, Chunjie and Tang, Jie and others},
-  journal={arXiv preprint arXiv:2205.10803},
+  author={Hou, Zhenyu and Liu, Xiao and Cen, Yukuo and Dong, Yuxiao and Yang, Hongxia and Wang, Chunjie and Tang, Jie},
+  journal={arXiv e-prints},
+  pages={arXiv--2205},
   year={2022}
 }
 ```
