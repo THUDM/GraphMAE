@@ -277,3 +277,27 @@ NCI1:
   alpha_l: 2
   replace_rate: 0.1
   norm: batchnorm
+bikeguessr:
+  lr: 0.001
+  lr_f: 0.01
+  num_hidden: 512
+  num_heads: 4
+  num_layers: 2
+  weight_decay: 2e-4
+  weight_decay_f: 1e-4
+  max_epoch: 1500
+  max_epoch_f: 300
+  mask_rate: 0.5
+  num_layers: 2
+  encoder: gat
+  decoder: gat 
+  activation: prelu
+  in_drop: 0.2
+  attn_drop: 0.1
+  linear_prob: True
+  loss_fn: sce 
+  drop_edge_rate: 0.0
+  optimizer: adam
+  replace_rate: 0.05 
+  alpha_l: 3
+  scheduler: True
