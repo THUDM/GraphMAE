@@ -9,7 +9,7 @@
 
 Implementation for KDD'22 paper:  [GraphMAE: Self-Supervised Masked Graph Autoencoders](https://arxiv.org/abs/2205.10803).
 
-We also have a [Chinese blog](https://zhuanlan.zhihu.com/p/520389049) about GraphMAE on Zhihu (知乎).
+We also have a [Chinese blog](https://zhuanlan.zhihu.com/p/520389049) about GraphMAE on Zhihu (知乎), and an [English Blog](https://medium.com/p/7a641f8c66d0#4fae-bff62a5b8b4b) on Medium.
 
 GraphMAE is a generative self-supervised graph learning method, which achieves competitive or better performance than existing contrastive methods on tasks including *node classification*, *graph classification*, and *molecular property prediction*.
 
