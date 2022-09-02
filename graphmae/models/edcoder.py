@@ -238,7 +238,6 @@ class PreModel(nn.Module):
         else:
             use_g = pre_use_g
 
-        # use_g = pre_use_g
         enc_rep, all_hidden = self.encoder(use_g, use_x, return_hidden=True)
         if self._concat_hidden:
             enc_rep = torch.cat(all_hidden, dim=1)
@@ -246,11 +245,11 @@ class PreModel(nn.Module):
         # ---- attribute reconstruction ----
         rep = self.encoder_to_decoder(enc_rep)
 
-        if self._decoder_type != "mlp":
+        if self._decoder_type not in ("mlp", "linear"):
             # * remask, re-mask
-            rep[mask_nodes] = 0 #
+            rep[mask_nodes] = 0
 
-        if self._decoder_type == "mlp":
+        if self._decoder_type in ("mlp", "liear") :
             recon = self.decoder(rep)
         else:
             recon = self.decoder(pre_use_g, rep)
