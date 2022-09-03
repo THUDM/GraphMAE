@@ -147,7 +147,11 @@ class ApplyNodeFunc(nn.Module):
     def __init__(self, mlp, norm="batchnorm", activation="relu"):
         super(ApplyNodeFunc, self).__init__()
         self.mlp = mlp
-        self.norm = create_norm(norm)(self.mlp.output_dim)
+        norm_func = create_norm(norm)
+        if norm_func is None:
+            self.norm = nn.Identity()
+        else:
+            self.norm = norm_func(self.mlp.output_dim)
         self.act = create_activation(activation)
 
     def forward(self, h):
