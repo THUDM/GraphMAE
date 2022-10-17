@@ -76,8 +76,8 @@ def build_args():
 
     parser.add_argument("--encoder", type=str, default="gat")
     parser.add_argument("--decoder", type=str, default="gat")
-    parser.add_argument("--loss_fn", type=str, default="byol")
-    parser.add_argument("--alpha_l", type=float, default=2, help="`pow`inddex for `sce` loss")
+    parser.add_argument("--loss_fn", type=str, default="sce")
+    parser.add_argument("--alpha_l", type=float, default=2, help="`pow`coefficient for `sce` loss")
     parser.add_argument("--optimizer", type=str, default="adam")
     
     parser.add_argument("--max_epoch_f", type=int, default=30)

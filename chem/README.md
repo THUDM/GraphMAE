@@ -28,7 +28,7 @@ python pretraining.py
 python finetune.py --input_model_file <model_path> --dataset <dataset_name>
 ```
 
-Results in the paper can be reproduced by running `sh finetune.sh <dataset_name>` using the pre-trained model in `./init_weights/pretrained.pth`.
+Results in the paper can be reproduced by running `sh finetune.sh <dataset_name>` using the pre-trained model in `./init_weights/pretrained.pth`. Most hyper-parameters are shared across datasets. The differences can be found in `finetuning.py`.
 
 
 
