@@ -123,7 +123,7 @@ def create_norm(name):
     elif name == "graphnorm":
         return partial(NormLayer, norm_type="groupnorm")
     else:
-        return None
+        return nn.Identity
 
 
 def create_optimizer(opt, model, lr, weight_decay, get_num_layer=None, get_layer_scale=None):
