@@ -246,6 +246,7 @@ REDDIT-BINARY:
   batch_size: 8
   replace_rate: 0.1
   norm: layernorm
+  loss_fn: sce
 COLLAB:
   lr: 0.00015
   weight_decay: 0.0
@@ -260,6 +261,7 @@ COLLAB:
   scheduler: True
   pool: max
   batch_size: 32
+  loss_fn: sce
   norm: batchnorm
 NCI1:
   lr: 0.001
@@ -277,3 +279,4 @@ NCI1:
   alpha_l: 2
   replace_rate: 0.1
   norm: batchnorm
+  loss_fn: sce
