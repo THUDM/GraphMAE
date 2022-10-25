@@ -167,6 +167,7 @@ IMDB-BINARY:
   linear_prob: True
   pooling: mean
   batch_size: 32
+  alpha_l: 1
 IMDB-MULTI:
   lr: 0.00015
   num_hidden: 512
@@ -189,6 +190,7 @@ IMDB-MULTI:
   linear_prob: True
   pooling: mean
   batch_size: 32
+  alpha_l: 1
 PROTEINS:
   lr: 0.00015
   num_hidden: 512
@@ -210,6 +212,7 @@ PROTEINS:
   pooling: max
   batch_size: 32
   norm: batchnorm
+  alpha_l: 1
 MUTAG:
   num_hidden: 32
   num_layers: 5
@@ -230,6 +233,7 @@ MUTAG:
   norm: batchnorm
   in_drop: 0.2
   attn_drop: 0.1
+  alpha_l: 2
 REDDIT-BINARY:
   lr: 0.00015
   weight_decay: 0.0
@@ -247,6 +251,7 @@ REDDIT-BINARY:
   replace_rate: 0.1
   norm: layernorm
   loss_fn: sce
+  alpha_l: 2
 COLLAB:
   lr: 0.00015
   weight_decay: 0.0
@@ -259,10 +264,11 @@ COLLAB:
   encoder: gin
   decoder: gin
   scheduler: True
-  pool: max
+  pooling: max
   batch_size: 32
   loss_fn: sce
   norm: batchnorm
+  alpha_l: 1
 NCI1:
   lr: 0.001
   max_epoch: 300
@@ -280,3 +286,4 @@ NCI1:
   replace_rate: 0.1
   norm: batchnorm
   loss_fn: sce
+  alpha_l: 2
