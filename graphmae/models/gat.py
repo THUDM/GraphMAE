@@ -1,9 +1,18 @@
+from typing import Optional, Tuple, Union
+
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch import Tensor
+from torch.nn import Parameter
+from torch_geometric.nn.conv import MessagePassing
+from torch_geometric.nn.dense.linear import Linear
+from torch_geometric.typing import NoneType  # noqa
+from torch_geometric.typing import Adj, OptPairTensor, OptTensor, Size
+from torch_geometric.utils import add_self_loops, remove_self_loops, softmax
 
-from dgl.ops import edge_softmax
-import dgl.function as fn
-from dgl.utils import expand_as_pair
+from torch_geometric.nn.inits import glorot, zeros
+
 
 from graphmae.utils import create_activation
 
@@ -33,6 +42,9 @@ class GAT(nn.Module):
         self.activation = activation
         self.concat_out = concat_out
 
+        self.feat_drop = feat_drop
+
+        self.activation = create_activation(activation)
         last_activation = create_activation(activation) if encoding else None
         last_residual = (encoding and residual)
         last_norm = norm if encoding else None
@@ -40,57 +52,31 @@ class GAT(nn.Module):
         if num_layers == 1:
             self.gat_layers.append(GATConv(
                 in_dim, out_dim, nhead_out,
-                feat_drop, attn_drop, negative_slope, last_residual, norm=last_norm, concat_out=concat_out))
+                concat=concat_out,negative_slope=negative_slope, dropout=attn_drop,residul=last_residual, norm=last_norm,))
         else:
             # input projection (no residual)
             self.gat_layers.append(GATConv(
                 in_dim, num_hidden, nhead,
-                feat_drop, attn_drop, negative_slope, residual, create_activation(activation), norm=norm, concat_out=concat_out))
+                concat=concat_out, negative_slope=negative_slope, dropout=attn_drop, activation=create_activation(activation),residul=residual, norm=norm))
             # hidden layers
             for l in range(1, num_layers - 1):
                 # due to multi-head, the in_dim = num_hidden * num_heads
                 self.gat_layers.append(GATConv(
                     num_hidden * nhead, num_hidden, nhead,
-                    feat_drop, attn_drop, negative_slope, residual, create_activation(activation), norm=norm, concat_out=concat_out))
+                    concat=concat_out, negative_slope=negative_slope, dropout=attn_drop, activation= create_activation(activation),residul=residual, norm=norm))
             # output projection
             self.gat_layers.append(GATConv(
                 num_hidden * nhead, out_dim, nhead_out,
-                feat_drop, attn_drop, negative_slope, last_residual, activation=last_activation, norm=last_norm, concat_out=concat_out))
-
-        # if norm is not None:
-        #     self.norms = nn.ModuleList([
-        #         norm(num_hidden * nhead)
-        #         for _ in range(num_layers - 1)
-        #     ])
-        #     if self.concat_out:
-        #         self.norms.append(norm(num_hidden * nhead))
-        # else:
-        #     self.norms = None
+                concat=concat_out,negative_slope=negative_slope, dropout=attn_drop, activation=last_activation,residul=last_residual, norm=last_norm))
     
         self.head = nn.Identity()
 
-    # def forward(self, g, inputs):
-    #     h = inputs
-    #     for l in range(self.num_layers):
-    #         h = self.gat_layers[l](g, h)
-    #         if l != self.num_layers - 1:
-    #             h = h.flatten(1)
-    #             if self.norms is not None:
-    #                 h = self.norms[l](h)
-    #     # output projection
-    #     if self.concat_out:
-    #         out = h.flatten(1)
-    #         if self.norms is not None:
-    #             out = self.norms[-1](out)
-    #     else:
-    #         out = h.mean(1)
-    #     return self.head(out)
-    
-    def forward(self, g, inputs, return_hidden=False):
-        h = inputs
+    def forward(self, x, edge_index, return_hidden=False):
+        h = x
         hidden_list = []
         for l in range(self.num_layers):
-            h = self.gat_layers[l](g, h)
+            h = F.dropout(h, p=self.feat_drop, training=self.training)
+            h = self.gat_layers[l](h, edge_index)
             hidden_list.append(h)
             # h = h.flatten(1)
         # output projection
@@ -102,181 +88,217 @@ class GAT(nn.Module):
     def reset_classifier(self, num_classes):
         self.head = nn.Linear(self.num_heads * self.out_dim, num_classes)
 
+class GATConv(MessagePassing):
+    def __init__(
+        self,
+        in_channels: Union[int, Tuple[int, int]],
+        out_channels: int,
+        heads: int = 1,
+        concat: bool = True,
+        negative_slope: float = 0.2,
+        dropout: float = 0.0,
+        add_self_loops: bool = True,
+        edge_dim: Optional[int] = None,
+        fill_value: Union[float, Tensor, str] = 'mean',
+        bias: bool = True,
+        activation = None,
+        residual = False,
+        norm = None,
+        **kwargs,
+    ):
+        kwargs.setdefault('aggr', 'add')
+        super().__init__(node_dim=0, **kwargs)
 
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.heads = heads
+        self.concat = concat
+        self.negative_slope = negative_slope
+        self.dropout = dropout
+        self.add_self_loops = add_self_loops
+        self.edge_dim = edge_dim
+        self.fill_value = fill_value
 
-class GATConv(nn.Module):
-    def __init__(self,
-                 in_feats,
-                 out_feats,
-                 num_heads,
-                 feat_drop=0.,
-                 attn_drop=0.,
-                 negative_slope=0.2,
-                 residual=False,
-                 activation=None,
-                 allow_zero_in_degree=False,
-                 bias=True,
-                 norm=None,
-                 concat_out=True):
-        super(GATConv, self).__init__()
-        self._num_heads = num_heads
-        self._in_src_feats, self._in_dst_feats = expand_as_pair(in_feats)
-        self._out_feats = out_feats
-        self._allow_zero_in_degree = allow_zero_in_degree
-        self._concat_out = concat_out
+        self.activation = activation
 
-        if isinstance(in_feats, tuple):
-            self.fc_src = nn.Linear(
-                self._in_src_feats, out_feats * num_heads, bias=False)
-            self.fc_dst = nn.Linear(
-                self._in_dst_feats, out_feats * num_heads, bias=False)
-        else:
-            self.fc = nn.Linear(
-                self._in_src_feats, out_feats * num_heads, bias=False)
-        self.attn_l = nn.Parameter(torch.FloatTensor(size=(1, num_heads, out_feats)))
-        self.attn_r = nn.Parameter(torch.FloatTensor(size=(1, num_heads, out_feats)))
-        self.feat_drop = nn.Dropout(feat_drop)
-        self.attn_drop = nn.Dropout(attn_drop)
-        self.leaky_relu = nn.LeakyReLU(negative_slope)
-        if bias:
-            self.bias = nn.Parameter(torch.FloatTensor(size=(num_heads * out_feats,)))
-        else:
-            self.register_buffer('bias', None)
         if residual:
-            if self._in_dst_feats != out_feats * num_heads:
+            if self.in_channels != out_channels * heads:
                 self.res_fc = nn.Linear(
-                    self._in_dst_feats, num_heads * out_feats, bias=False)
+                    self.in_channels, heads * out_channels, bias=False)
             else:
                 self.res_fc = nn.Identity()
         else:
             self.register_buffer('res_fc', None)
-        self.reset_parameters()
-        self.activation = activation
-        # if norm is not None:
-        #     self.norm = norm(num_heads * out_feats)
-        # else:
-        #     self.norm = None
-    
+
+        # In case we are operating in bipartite graphs, we apply separate
+        # transformations 'lin_src' and 'lin_dst' to source and target nodes:
+        if isinstance(in_channels, int):
+            self.lin_src = Linear(in_channels, heads * out_channels,
+                                  bias=False, weight_initializer='glorot')
+            self.lin_dst = self.lin_src
+        else:
+            self.lin_src = Linear(in_channels[0], heads * out_channels, False,
+                                  weight_initializer='glorot')
+            self.lin_dst = Linear(in_channels[1], heads * out_channels, False,
+                                  weight_initializer='glorot')
+        
         self.norm = norm
         if norm is not None:
-            self.norm = norm(num_heads * out_feats)
+            self.norm = norm(heads * out_channels)
+        # The learnable parameters to compute attention coefficients:
+        self.att_src = Parameter(torch.Tensor(1, heads, out_channels))
+        self.att_dst = Parameter(torch.Tensor(1, heads, out_channels))
+
+        if edge_dim is not None:
+            self.lin_edge = Linear(edge_dim, heads * out_channels, bias=False,
+                                   weight_initializer='glorot')
+            self.att_edge = Parameter(torch.Tensor(1, heads, out_channels))
+        else:
+            self.lin_edge = None
+            self.register_parameter('att_edge', None)
+
+        if bias and concat:
+            self.bias = Parameter(torch.Tensor(heads * out_channels))
+        elif bias and not concat:
+            self.bias = Parameter(torch.Tensor(out_channels))
+        else:
+            self.register_parameter('bias', None)
+
+        self.reset_parameters()
 
     def reset_parameters(self):
-        """
+        nn.init.xavier_normal_(self.lin_src.weight, gain=1.414)
+        nn.init.xavier_normal_(self.lin_dst.weight, gain=1.414)
 
-        Description
-        -----------
-        Reinitialize learnable parameters.
+        nn.init.xavier_normal_(self.att_src, gain=1.414)
+        nn.init.xavier_normal_(self.att_dst, gain=1.414)
+        nn.init.constant_(self.bias, 0)
 
-        Note
-        ----
-        The fc weights :math:`W^{(l)}` are initialized using Glorot uniform initialization.
-        The attention weights are using xavier initialization method.
-        """
-        gain = nn.init.calculate_gain('relu')
-        if hasattr(self, 'fc'):
-            nn.init.xavier_normal_(self.fc.weight, gain=gain)
-        else:
-            nn.init.xavier_normal_(self.fc_src.weight, gain=gain)
-            nn.init.xavier_normal_(self.fc_dst.weight, gain=gain)
-        nn.init.xavier_normal_(self.attn_l, gain=gain)
-        nn.init.xavier_normal_(self.attn_r, gain=gain)
-        if self.bias is not None:
-            nn.init.constant_(self.bias, 0)
         if isinstance(self.res_fc, nn.Linear):
             nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
 
-    def set_allow_zero_in_degree(self, set_value):
-        self._allow_zero_in_degree = set_value
+    def forward(self, x: Union[Tensor, OptPairTensor], edge_index: Adj,
+                edge_attr: OptTensor = None, size: Size = None,
+                return_attention_weights=None):
+        # type: (Union[Tensor, OptPairTensor], Tensor, OptTensor, Size, NoneType) -> Tensor  # noqa
+        # type: (Union[Tensor, OptPairTensor], SparseTensor, OptTensor, Size, NoneType) -> Tensor  # noqa
+        # type: (Union[Tensor, OptPairTensor], Tensor, OptTensor, Size, bool) -> Tuple[Tensor, Tuple[Tensor, Tensor]]  # noqa
+        # type: (Union[Tensor, OptPairTensor], SparseTensor, OptTensor, Size, bool) -> Tuple[Tensor, SparseTensor]  # noqa
+        r"""
+        Args:
+            return_attention_weights (bool, optional): If set to :obj:`True`,
+                will additionally return the tuple
+                :obj:`(edge_index, attention_weights)`, holding the computed
+                attention weights for each edge. (default: :obj:`None`)
+        """
+        # NOTE: attention weights will be returned whenever
+        # `return_attention_weights` is set to a value, regardless of its
+        # actual value (might be `True` or `False`). This is a current somewhat
+        # hacky workaround to allow for TorchScript support via the
+        # `torch.jit._overload` decorator, as we can only change the output
+        # arguments conditioned on type (`None` or `bool`), not based on its
+        # actual value.
 
-    def forward(self, graph, feat, get_attention=False):
-        with graph.local_scope():
-            if not self._allow_zero_in_degree:
-                if (graph.in_degrees() == 0).any():
-                    raise RuntimeError('There are 0-in-degree nodes in the graph, '
-                                   'output for those nodes will be invalid. '
-                                   'This is harmful for some applications, '
-                                   'causing silent performance regression. '
-                                   'Adding self-loop on the input graph by '
-                                   'calling `g = dgl.add_self_loop(g)` will resolve '
-                                   'the issue. Setting ``allow_zero_in_degree`` '
-                                   'to be `True` when constructing this module will '
-                                   'suppress the check and let the code run.')
+        H, C = self.heads, self.out_channels
 
-            if isinstance(feat, tuple):
-                src_prefix_shape = feat[0].shape[:-1]
-                dst_prefix_shape = feat[1].shape[:-1]
-                h_src = self.feat_drop(feat[0])
-                h_dst = self.feat_drop(feat[1])
-                if not hasattr(self, 'fc_src'):
-                    feat_src = self.fc(h_src).view(
-                        *src_prefix_shape, self._num_heads, self._out_feats)
-                    feat_dst = self.fc(h_dst).view(
-                        *dst_prefix_shape, self._num_heads, self._out_feats)
+        # We first transform the input node features. If a tuple is passed, we
+        # transform source and target node features via separate weights:
+        if isinstance(x, Tensor):
+            assert x.dim() == 2, "Static graphs not supported in 'GATConv'"
+            x_src = x_dst = self.lin_src(x).view(-1, H, C)
+        else:  # Tuple of source and target node features:
+            x_src, x_dst = x
+            assert x_src.dim() == 2, "Static graphs not supported in 'GATConv'"
+            x_src = self.lin_src(x_src).view(-1, H, C)
+            if x_dst is not None:
+                x_dst = self.lin_dst(x_dst).view(-1, H, C)
+
+        x = (x_src, x_dst)
+
+        # Next, we compute node-level attention coefficients, both for source
+        # and target nodes (if present):
+        alpha_src = (x_src * self.att_src).sum(dim=-1)
+        alpha_dst = None if x_dst is None else (x_dst * self.att_dst).sum(-1)
+        alpha = (alpha_src, alpha_dst)
+
+        if self.add_self_loops:
+            if isinstance(edge_index, Tensor):
+                # We only want to add self-loops for nodes that appear both as
+                # source and target nodes:
+                num_nodes = x_src.size(0)
+                if x_dst is not None:
+                    num_nodes = min(num_nodes, x_dst.size(0))
+                num_nodes = min(size) if size is not None else num_nodes
+                edge_index, edge_attr = remove_self_loops(
+                    edge_index, edge_attr)
+                edge_index, edge_attr = add_self_loops(
+                    edge_index, edge_attr, fill_value=self.fill_value,
+                    num_nodes=num_nodes)
+            elif isinstance(edge_index, SparseTensor):
+                if self.edge_dim is None:
+                    edge_index = set_diag(edge_index)
                 else:
-                    feat_src = self.fc_src(h_src).view(
-                        *src_prefix_shape, self._num_heads, self._out_feats)
-                    feat_dst = self.fc_dst(h_dst).view(
-                        *dst_prefix_shape, self._num_heads, self._out_feats)
-            else:
-                src_prefix_shape = dst_prefix_shape = feat.shape[:-1]
-                h_src = h_dst = self.feat_drop(feat)
-                feat_src = feat_dst = self.fc(h_src).view(
-                    *src_prefix_shape, self._num_heads, self._out_feats)
-                if graph.is_block:
-                    feat_dst = feat_src[:graph.number_of_dst_nodes()]
-                    h_dst = h_dst[:graph.number_of_dst_nodes()]
-                    dst_prefix_shape = (graph.number_of_dst_nodes(),) + dst_prefix_shape[1:]
-            # NOTE: GAT paper uses "first concatenation then linear projection"
-            # to compute attention scores, while ours is "first projection then
-            # addition", the two approaches are mathematically equivalent:
-            # We decompose the weight vector a mentioned in the paper into
-            # [a_l || a_r], then
-            # a^T [Wh_i || Wh_j] = a_l Wh_i + a_r Wh_j
-            # Our implementation is much efficient because we do not need to
-            # save [Wh_i || Wh_j] on edges, which is not memory-efficient. Plus,
-            # addition could be optimized with DGL's built-in function u_add_v,
-            # which further speeds up computation and saves memory footprint.
-            el = (feat_src * self.attn_l).sum(dim=-1).unsqueeze(-1)
-            er = (feat_dst * self.attn_r).sum(dim=-1).unsqueeze(-1)
-            graph.srcdata.update({'ft': feat_src, 'el': el})
-            graph.dstdata.update({'er': er})
-            # compute edge attention, el and er are a_l Wh_i and a_r Wh_j respectively.
-            graph.apply_edges(fn.u_add_v('el', 'er', 'e'))
-            e = self.leaky_relu(graph.edata.pop('e'))
-            # e[e == 0] = -1e3
-            # e = graph.edata.pop('e')
-            # compute softmax
-            graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
-            # message passing
-            graph.update_all(fn.u_mul_e('ft', 'a', 'm'),
-                             fn.sum('m', 'ft'))
-            rst = graph.dstdata['ft']
+                    raise NotImplementedError(
+                        "The usage of 'edge_attr' and 'add_self_loops' "
+                        "simultaneously is currently not yet supported for "
+                        "'edge_index' in a 'SparseTensor' form")
 
-            # bias
-            if self.bias is not None:
-                rst = rst + self.bias.view(
-                    *((1,) * len(dst_prefix_shape)), self._num_heads, self._out_feats)
+        # edge_updater_type: (alpha: OptPairTensor, edge_attr: OptTensor)
+        alpha = self.edge_updater(edge_index, alpha=alpha, edge_attr=edge_attr)
 
-            # residual
-            if self.res_fc is not None:
-                # Use -1 rather than self._num_heads to handle broadcasting
-                resval = self.res_fc(h_dst).view(*dst_prefix_shape, -1, self._out_feats)
-                rst = rst + resval
+        # propagate_type: (x: OptPairTensor, alpha: Tensor)
+        out = self.propagate(edge_index, x=x, alpha=alpha, size=size)
+        # residual
+        if self.res_fc is not None:
+            # Use -1 rather than self._num_heads to handle broadcasting
+            resval = self.res_fc(x_dst).view(x_dst.shape[:-1], -1, self.out_channels)
+            out = out + resval
 
-            if self._concat_out:
-                rst = rst.flatten(1)
-            else:
-                rst = torch.mean(rst, dim=1)
+        if self.concat:
+            out = out.view(-1, self.heads * self.out_channels)
+        else:
+            out = out.mean(dim=1)
 
-            if self.norm is not None:
-                rst = self.norm(rst)
+        if self.bias is not None:
+            out = out + self.bias
+        
+        if self.norm is not None:
+            out = self.norm(out)
 
-            # activation
-            if self.activation:
-                rst = self.activation(rst)
+        if self.activation:
+            out = self.activation(out)
 
-            if get_attention:
-                return rst, graph.edata['a']
-            else:
-                return rst
+        if isinstance(return_attention_weights, bool):
+            if isinstance(edge_index, Tensor):
+                return out, (edge_index, alpha)
+            elif isinstance(edge_index, SparseTensor):
+                return out, edge_index.set_value(alpha, layout='coo')
+        else:
+            return out
+
+    def edge_update(self, alpha_j: Tensor, alpha_i: OptTensor,
+                    edge_attr: OptTensor, index: Tensor, ptr: OptTensor,
+                    size_i: Optional[int]) -> Tensor:
+        # Given edge-level attention coefficients for source and target nodes,
+        # we simply need to sum them up to "emulate" concatenation:
+        alpha = alpha_j if alpha_i is None else alpha_j + alpha_i
+
+        if edge_attr is not None and self.lin_edge is not None:
+            if edge_attr.dim() == 1:
+                edge_attr = edge_attr.view(-1, 1)
+            edge_attr = self.lin_edge(edge_attr)
+            edge_attr = edge_attr.view(-1, self.heads, self.out_channels)
+            alpha_edge = (edge_attr * self.att_edge).sum(dim=-1)
+            alpha = alpha + alpha_edge
+
+        alpha = F.leaky_relu(alpha, self.negative_slope)
+        alpha = softmax(alpha, index, ptr, size_i)
+        alpha = F.dropout(alpha, p=self.dropout, training=self.training)
+        return alpha
+
+    def message(self, x_j: Tensor, alpha: Tensor) -> Tensor:
+        return alpha.unsqueeze(-1) * x_j
+
+    def __repr__(self) -> str:
+        return (f'{self.__class__.__name__}({self.in_channels}, '
+                f'{self.out_channels}, heads={self.heads})')
