@@ -1,9 +1,25 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GATConv
+from torch_geometric.nn import GATConv as PGATConv
 
 from graphmae.utils import create_activation
+
+
+class GATConv(PGATConv):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # self.lin_src.reset_parameters()
+        # self.lin_dst.reset_parameters()
+        nn.init.xavier_normal_(self.lin_src.weight, gain=1.414)
+        nn.init.xavier_normal_(self.lin_dst.weight, gain=1.414)
+
+        nn.init.xavier_normal_(self.att_src, gain=1.414)
+        nn.init.xavier_normal_(self.att_dst, gain=1.414)
+        nn.init.constant_(self.bias, 0)
 
 
 class GAT(nn.Module):
@@ -31,9 +47,12 @@ class GAT(nn.Module):
         self.activation = activation
         self.concat_out = concat_out
 
+        print(in_dim, num_hidden, out_dim, nhead, nhead_out, )
         self.feat_drop = feat_drop
 
-        self.activation = create_activation(activation)
+        self.activation = nn.ModuleList([
+            create_activation(activation) for _ in range(num_layers)
+        ])
         self.last_activation = create_activation(activation) if encoding else None
         last_residual = (encoding and residual)
         last_norm = norm if encoding else None
@@ -41,22 +60,22 @@ class GAT(nn.Module):
         if num_layers == 1:
             self.gat_layers.append(GATConv(
                 in_dim, out_dim, nhead_out,
-                attn_drop, negative_slope=negative_slope, concat_out=concat_out))
+                dropout=attn_drop, negative_slope=negative_slope, concat=concat_out, add_self_loops=False))
         else:
             # input projection (no residual)
             self.gat_layers.append(GATConv(
                 in_dim, num_hidden, nhead,
-                attn_drop, negative_slope=negative_slope, concat_out=concat_out))
+                dropout=attn_drop, negative_slope=negative_slope, concat=concat_out, add_self_loops=False))
             # hidden layers
             for l in range(1, num_layers - 1):
                 # due to multi-head, the in_dim = num_hidden * num_heads
                 self.gat_layers.append(GATConv(
                     num_hidden * nhead, num_hidden, nhead,
-                    attn_drop, negative_slope=negative_slope, concat_out=concat_out))
+                    dropout=attn_drop, negative_slope=negative_slope, concat=concat_out, add_self_loops=False))
             # output projection
             self.gat_layers.append(GATConv(
                 num_hidden * nhead, out_dim, nhead_out,
-                attn_drop, negative_slope=negative_slope, concat_out=concat_out))
+                dropout=attn_drop, negative_slope=negative_slope, concat=concat_out, add_self_loops=False))
     
         self.head = nn.Identity()
 
@@ -70,7 +89,7 @@ class GAT(nn.Module):
                 if self.last_activation:
                     h = self.last_activation(h)
             else:
-                h = self.activation(h)
+                h = self.activation[l](h)
             hidden_list.append(h)
             # h = h.flatten(1)
         # output projection
@@ -81,4 +100,3 @@ class GAT(nn.Module):
 
     def reset_classifier(self, num_classes):
         self.head = nn.Linear(self.num_heads * self.out_dim, num_classes)
-
