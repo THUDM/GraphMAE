@@ -8,8 +8,9 @@ from torch.nn import Parameter
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.typing import NoneType  # noqa
-from torch_geometric.typing import Adj, OptPairTensor, OptTensor, Size
-from torch_geometric.utils import add_self_loops, remove_self_loops, softmax
+from torch_geometric.typing import Adj, OptPairTensor, OptTensor, Size, SparseTensor
+from torch_geometric.utils import softmax
+
 
 from torch_geometric.nn.inits import glorot, zeros
 
@@ -63,7 +64,7 @@ class GAT(nn.Module):
                 # due to multi-head, the in_dim = num_hidden * num_heads
                 self.gat_layers.append(GATConv(
                     num_hidden * nhead, num_hidden, nhead,
-                    concat=concat_out, negative_slope=negative_slope, dropout=attn_drop, activation= create_activation(activation),residul=residual, norm=norm))
+                    concat=concat_out, negative_slope=negative_slope, dropout=attn_drop, activation=create_activation(activation), residul=residual, norm=norm))
             # output projection
             self.gat_layers.append(GATConv(
                 num_hidden * nhead, out_dim, nhead_out,
@@ -97,7 +98,6 @@ class GATConv(MessagePassing):
         concat: bool = True,
         negative_slope: float = 0.2,
         dropout: float = 0.0,
-        add_self_loops: bool = True,
         edge_dim: Optional[int] = None,
         fill_value: Union[float, Tensor, str] = 'mean',
         bias: bool = True,
@@ -115,7 +115,6 @@ class GATConv(MessagePassing):
         self.concat = concat
         self.negative_slope = negative_slope
         self.dropout = dropout
-        self.add_self_loops = add_self_loops
         self.edge_dim = edge_dim
         self.fill_value = fill_value
 
@@ -220,28 +219,6 @@ class GATConv(MessagePassing):
         alpha_src = (x_src * self.att_src).sum(dim=-1)
         alpha_dst = None if x_dst is None else (x_dst * self.att_dst).sum(-1)
         alpha = (alpha_src, alpha_dst)
-
-        if self.add_self_loops:
-            if isinstance(edge_index, Tensor):
-                # We only want to add self-loops for nodes that appear both as
-                # source and target nodes:
-                num_nodes = x_src.size(0)
-                if x_dst is not None:
-                    num_nodes = min(num_nodes, x_dst.size(0))
-                num_nodes = min(size) if size is not None else num_nodes
-                edge_index, edge_attr = remove_self_loops(
-                    edge_index, edge_attr)
-                edge_index, edge_attr = add_self_loops(
-                    edge_index, edge_attr, fill_value=self.fill_value,
-                    num_nodes=num_nodes)
-            elif isinstance(edge_index, SparseTensor):
-                if self.edge_dim is None:
-                    edge_index = set_diag(edge_index)
-                else:
-                    raise NotImplementedError(
-                        "The usage of 'edge_attr' and 'add_self_loops' "
-                        "simultaneously is currently not yet supported for "
-                        "'edge_index' in a 'SparseTensor' form")
 
         # edge_updater_type: (alpha: OptPairTensor, edge_attr: OptTensor)
         alpha = self.edge_updater(edge_index, alpha=alpha, edge_attr=edge_attr)

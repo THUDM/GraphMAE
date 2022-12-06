@@ -20,7 +20,6 @@ def scale_feats(x):
     return feats
 
 def load_dataset(dataset_name):
-    #transform = T.Compose([T.NormalizeFeatures(), T.ToSparseTensor()])
     if dataset_name == "ogbn-arxiv":
         dataset = PygNodePropPredDataset(name='ogbn-arxiv', root="/mnt/vepfs/yufei/dataset/")
         graph = dataset[0]
