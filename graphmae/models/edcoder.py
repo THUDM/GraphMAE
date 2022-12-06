@@ -5,12 +5,10 @@ from functools import partial
 import torch
 import torch.nn as nn
 
-from .gin import GIN
 from .gat import GAT
-from .gcn import GCN
-from .dot_gat import DotGAT
 from .loss_func import sce_loss
-from graphmae.utils import create_norm, drop_edge
+from graphmae.utils import create_norm
+from torch_geometric.utils import dropout_edge
 
 
 def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropout, activation, residual, norm, nhead, nhead_out, attn_drop, negative_slope=0.2, concat_out=True) -> nn.Module:
@@ -30,46 +28,6 @@ def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropo
             residual=residual,
             norm=create_norm(norm),
             encoding=(enc_dec == "encoding"),
-        )
-    elif m_type == "dotgat":
-        mod = DotGAT(
-            in_dim=in_dim,
-            num_hidden=num_hidden,
-            out_dim=out_dim,
-            num_layers=num_layers,
-            nhead=nhead,
-            nhead_out=nhead_out,
-            concat_out=concat_out,
-            activation=activation,
-            feat_drop=dropout,
-            attn_drop=attn_drop,
-            residual=residual,
-            norm=create_norm(norm),
-            encoding=(enc_dec == "encoding"),
-        )
-    elif m_type == "gin":
-        mod = GIN(
-            in_dim=in_dim,
-            num_hidden=num_hidden,
-            out_dim=out_dim,
-            num_layers=num_layers,
-            dropout=dropout,
-            activation=activation,
-            residual=residual,
-            norm=norm,
-            encoding=(enc_dec == "encoding"),
-        )
-    elif m_type == "gcn":
-        mod = GCN(
-            in_dim=in_dim, 
-            num_hidden=num_hidden, 
-            out_dim=out_dim, 
-            num_layers=num_layers, 
-            dropout=dropout, 
-            activation=activation, 
-            residual=residual, 
-            norm=create_norm(norm),
-            encoding=(enc_dec == "encoding")
         )
     elif m_type == "mlp":
         # * just for decoder 
@@ -194,8 +152,8 @@ class PreModel(nn.Module):
             raise NotImplementedError
         return criterion
     
-    def encoding_mask_noise(self, g, x, mask_rate=0.3):
-        num_nodes = g.num_nodes()
+    def encoding_mask_noise(self, x, mask_rate=0.3):
+        num_nodes = x.shape[0]
         perm = torch.randperm(num_nodes, device=x.device)
         num_mask_nodes = int(mask_rate * num_nodes)
 
@@ -220,25 +178,24 @@ class PreModel(nn.Module):
             out_x[mask_nodes] = 0.0
 
         out_x[token_nodes] += self.enc_mask_token
-        use_g = g.clone()
 
-        return use_g, out_x, (mask_nodes, keep_nodes)
+        return out_x, (mask_nodes, keep_nodes)
 
-    def forward(self, g, x):
+    def forward(self, x, edge_index):
         # ---- attribute reconstruction ----
-        loss = self.mask_attr_prediction(g, x)
+        loss = self.mask_attr_prediction(x, edge_index)
         loss_item = {"loss": loss.item()}
         return loss, loss_item
     
-    def mask_attr_prediction(self, g, x):
-        pre_use_g, use_x, (mask_nodes, keep_nodes) = self.encoding_mask_noise(g, x, self._mask_rate)
+    def mask_attr_prediction(self, x, edge_index):
+        use_x, (mask_nodes, keep_nodes) = self.encoding_mask_noise(x, self._mask_rate)
 
         if self._drop_edge_rate > 0:
-            use_g, masked_edges = drop_edge(pre_use_g, self._drop_edge_rate, return_edges=True)
+            use_edge_index, masked_edges = dropout_edge(edge_index, self._drop_edge_rate)
         else:
-            use_g = pre_use_g
+            use_edge_index = edge_index
 
-        enc_rep, all_hidden = self.encoder(use_g, use_x, return_hidden=True)
+        enc_rep, all_hidden = self.encoder(use_x, use_edge_index, return_hidden=True)
         if self._concat_hidden:
             enc_rep = torch.cat(all_hidden, dim=1)
 
@@ -252,7 +209,7 @@ class PreModel(nn.Module):
         if self._decoder_type in ("mlp", "liear") :
             recon = self.decoder(rep)
         else:
-            recon = self.decoder(pre_use_g, rep)
+            recon = self.decoder(rep, use_edge_index)
 
         x_init = x[mask_nodes]
         x_rec = recon[mask_nodes]
@@ -260,8 +217,8 @@ class PreModel(nn.Module):
         loss = self.criterion(x_rec, x_init)
         return loss
 
-    def embed(self, g, x):
-        rep = self.encoder(g, x)
+    def embed(self, x, edge_index):
+        rep = self.encoder(x, edge_index)
         return rep
 
     @property

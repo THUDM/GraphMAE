@@ -6,8 +6,6 @@ import logging
 from functools import partial
 import numpy as np
 
-import dgl
-
 import torch
 import torch.nn as nn
 from torch import optim as optim
@@ -152,37 +150,6 @@ def create_optimizer(opt, model, lr, weight_decay, get_num_layer=None, get_layer
 
 
 # -------------------
-def mask_edge(graph, mask_prob):
-    E = graph.num_edges()
-
-    mask_rates = torch.FloatTensor(np.ones(E) * mask_prob)
-    masks = torch.bernoulli(1 - mask_rates)
-    mask_idx = masks.nonzero().squeeze(1)
-    return mask_idx
-
-
-def drop_edge(graph, drop_rate, return_edges=False):
-    if drop_rate <= 0:
-        return graph
-
-    n_node = graph.num_nodes()
-    edge_mask = mask_edge(graph, drop_rate)
-    src = graph.edges()[0]
-    dst = graph.edges()[1]
-
-    nsrc = src[edge_mask]
-    ndst = dst[edge_mask]
-
-    ng = dgl.graph((nsrc, ndst), num_nodes=n_node)
-    ng = ng.add_self_loop()
-
-    dsrc = src[~edge_mask]
-    ddst = dst[~edge_mask]
-
-    if return_edges:
-        return ng, (dsrc, ddst)
-    return ng
-
 
 def load_best_configs(args, path):
     with open(path, "r") as f:
