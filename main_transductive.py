@@ -28,7 +28,6 @@ def pretrain(model, graph, feat, optimizer, max_epoch, device, scheduler, num_cl
 
     for epoch in epoch_iter:
         model.train()
-
         loss, loss_dict = model(x, graph.edge_index)
 
         optimizer.zero_grad()
@@ -90,6 +89,7 @@ def main(args):
 
         model = build_model(args)
         model.to(device)
+        #print(model)
         optimizer = create_optimizer(optim_type, model, lr, weight_decay)
 
         if use_scheduler:

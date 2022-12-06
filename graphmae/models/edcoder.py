@@ -9,6 +9,7 @@ from .gat import GAT
 from .loss_func import sce_loss
 from graphmae.utils import create_norm
 from torch_geometric.utils import dropout_edge
+from torch_geometric.utils import add_self_loops, remove_self_loops
 
 
 def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropout, activation, residual, norm, nhead, nhead_out, attn_drop, negative_slope=0.2, concat_out=True) -> nn.Module:
@@ -192,6 +193,7 @@ class PreModel(nn.Module):
 
         if self._drop_edge_rate > 0:
             use_edge_index, masked_edges = dropout_edge(edge_index, self._drop_edge_rate)
+            use_edge_index = add_self_loops(use_edge_index)[0]
         else:
             use_edge_index = edge_index
 
