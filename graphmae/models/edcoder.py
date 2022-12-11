@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 from .gat import GAT
+from .gin import GIN
 from .loss_func import sce_loss
 from graphmae.utils import create_norm
 from torch_geometric.utils import dropout_edge
@@ -28,6 +29,18 @@ def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropo
             negative_slope=negative_slope,
             residual=residual,
             norm=create_norm(norm),
+            encoding=(enc_dec == "encoding"),
+        )
+    elif m_type == "gin":
+        mod = GIN(
+            in_dim=int(in_dim),
+            num_hidden=int(num_hidden),
+            out_dim=int(out_dim),
+            num_layers=num_layers,
+            dropout=dropout,
+            activation=activation,
+            residual=residual,
+            norm=norm,
             encoding=(enc_dec == "encoding"),
         )
     elif m_type == "mlp":
@@ -71,7 +84,6 @@ class PreModel(nn.Module):
          ):
         super(PreModel, self).__init__()
         self._mask_rate = mask_rate
-
         self._encoder_type = encoder_type
         self._decoder_type = decoder_type
         self._drop_edge_rate = drop_edge_rate

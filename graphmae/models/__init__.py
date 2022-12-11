@@ -26,8 +26,8 @@ def build_model(args):
 
 
     model = PreModel(
-        in_dim=num_features,
-        num_hidden=num_hidden,
+        in_dim=int(num_features),
+        num_hidden=int(num_hidden),
         num_layers=num_layers,
         nhead=num_heads,
         nhead_out=num_out_heads,
