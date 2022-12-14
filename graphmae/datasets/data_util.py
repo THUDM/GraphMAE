@@ -51,9 +51,10 @@ def load_dataset(dataset_name):
     num_classes = dataset.num_classes
     return graph, (num_features, num_classes)
 
+
 def load_graph_classification_dataset(dataset_name, deg4feat=False):
     dataset_name = dataset_name.upper()
-    dataset = TUDataset(root="/mnt/vepfs/yufei/dataset/", name = dataset_name)
+    dataset = TUDataset(root="./data", name=dataset_name)
     dataset = list(dataset)
     graph = dataset[0]
 

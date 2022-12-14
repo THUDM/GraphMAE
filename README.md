@@ -23,7 +23,7 @@ GraphMAE is a generative self-supervised graph learning method, which achieves c
 * Python >= 3.7
 * [Pytorch](https://pytorch.org/) >= 1.9.0 
 * pyyaml == 5.4.1
-* [Pytorch-geometric](https://github.com/pyg-team/pytorch_geometric) >= 2.0
+* [Pytorch-geometric](https://github.com/pyg-team/pytorch_geometric) >= 2.2.0
 
 
 <h2>Quick Start </h2>
