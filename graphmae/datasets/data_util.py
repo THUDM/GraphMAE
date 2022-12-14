@@ -12,6 +12,7 @@ from ogb.nodeproppred import PygNodePropPredDataset
 
 from sklearn.preprocessing import StandardScaler
 
+
 def scale_feats(x):
     scaler = StandardScaler()
     feats = x.numpy()
@@ -19,9 +20,10 @@ def scale_feats(x):
     feats = torch.from_numpy(scaler.transform(feats)).float()
     return feats
 
+
 def load_dataset(dataset_name):
     if dataset_name == "ogbn-arxiv":
-        dataset = PygNodePropPredDataset(name='ogbn-arxiv', root="/mnt/vepfs/yufei/dataset/")
+        dataset = PygNodePropPredDataset(name='ogbn-arxiv', root="./data")
         graph = dataset[0]
         num_nodes = graph.x.shape[0]
         graph.edge_index = to_undirected(graph.edge_index)
