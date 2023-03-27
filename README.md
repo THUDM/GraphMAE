@@ -120,11 +120,11 @@ Transfer learning on molecular property prediction (ROC-AUC, %):
 If you find this work is helpful to your research, please consider citing our paper:
 
 ```
-@article{hou2022graphmae,
+@inproceedings{hou2022graphmae,
   title={GraphMAE: Self-Supervised Masked Graph Autoencoders},
   author={Hou, Zhenyu and Liu, Xiao and Cen, Yukuo and Dong, Yuxiao and Yang, Hongxia and Wang, Chunjie and Tang, Jie},
-  journal={arXiv e-prints},
-  pages={arXiv--2205},
+  booktitle={Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
+  pages={594--604},
   year={2022}
 }
 ```
