@@ -7,7 +7,6 @@ from torch import Tensor
 from torch.nn import Parameter
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
-from torch_geometric.typing import NoneType  # noqa
 from torch_geometric.typing import Adj, OptPairTensor, OptTensor, Size, SparseTensor
 from torch_geometric.utils import softmax
 
@@ -53,22 +52,22 @@ class GAT(nn.Module):
         if num_layers == 1:
             self.gat_layers.append(GATConv(
                 in_dim, out_dim, nhead_out,
-                concat=concat_out,negative_slope=negative_slope, dropout=attn_drop,residul=last_residual, norm=last_norm,))
+                concat=concat_out,negative_slope=negative_slope, dropout=attn_drop,residual=last_residual, norm=last_norm,))
         else:
             # input projection (no residual)
             self.gat_layers.append(GATConv(
                 in_dim, num_hidden, nhead,
-                concat=concat_out, negative_slope=negative_slope, dropout=attn_drop, activation=create_activation(activation),residul=residual, norm=norm))
+                concat=concat_out, negative_slope=negative_slope, dropout=attn_drop, activation=create_activation(activation),residual=residual, norm=norm))
             # hidden layers
             for l in range(1, num_layers - 1):
                 # due to multi-head, the in_dim = num_hidden * num_heads
                 self.gat_layers.append(GATConv(
                     num_hidden * nhead, num_hidden, nhead,
-                    concat=concat_out, negative_slope=negative_slope, dropout=attn_drop, activation=create_activation(activation), residul=residual, norm=norm))
+                    concat=concat_out, negative_slope=negative_slope, dropout=attn_drop, activation=create_activation(activation), residual=residual, norm=norm))
             # output projection
             self.gat_layers.append(GATConv(
                 num_hidden * nhead, out_dim, nhead_out,
-                concat=concat_out,negative_slope=negative_slope, dropout=attn_drop, activation=last_activation,residul=last_residual, norm=last_norm))
+                concat=concat_out,negative_slope=negative_slope, dropout=attn_drop, activation=last_activation, residual=last_residual, norm=last_norm))
     
         self.head = nn.Identity()
 
@@ -88,6 +87,7 @@ class GAT(nn.Module):
 
     def reset_classifier(self, num_classes):
         self.head = nn.Linear(self.num_heads * self.out_dim, num_classes)
+
 
 class GATConv(MessagePassing):
     def __init__(
@@ -174,15 +174,11 @@ class GATConv(MessagePassing):
         nn.init.constant_(self.bias, 0)
 
         if isinstance(self.res_fc, nn.Linear):
-            nn.init.xavier_normal_(self.res_fc.weight, gain=gain)
+            nn.init.xavier_normal_(self.res_fc.weight, gain=1.414)
 
     def forward(self, x: Union[Tensor, OptPairTensor], edge_index: Adj,
                 edge_attr: OptTensor = None, size: Size = None,
                 return_attention_weights=None):
-        # type: (Union[Tensor, OptPairTensor], Tensor, OptTensor, Size, NoneType) -> Tensor  # noqa
-        # type: (Union[Tensor, OptPairTensor], SparseTensor, OptTensor, Size, NoneType) -> Tensor  # noqa
-        # type: (Union[Tensor, OptPairTensor], Tensor, OptTensor, Size, bool) -> Tuple[Tensor, Tuple[Tensor, Tensor]]  # noqa
-        # type: (Union[Tensor, OptPairTensor], SparseTensor, OptTensor, Size, bool) -> Tuple[Tensor, SparseTensor]  # noqa
         r"""
         Args:
             return_attention_weights (bool, optional): If set to :obj:`True`,
@@ -190,14 +186,6 @@ class GATConv(MessagePassing):
                 :obj:`(edge_index, attention_weights)`, holding the computed
                 attention weights for each edge. (default: :obj:`None`)
         """
-        # NOTE: attention weights will be returned whenever
-        # `return_attention_weights` is set to a value, regardless of its
-        # actual value (might be `True` or `False`). This is a current somewhat
-        # hacky workaround to allow for TorchScript support via the
-        # `torch.jit._overload` decorator, as we can only change the output
-        # arguments conditioned on type (`None` or `bool`), not based on its
-        # actual value.
-
         H, C = self.heads, self.out_channels
 
         # We first transform the input node features. If a tuple is passed, we
