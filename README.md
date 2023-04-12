@@ -22,6 +22,7 @@ GraphMAE is a generative self-supervised graph learning method, which achieves c
 <h3> ❗ Update </h3> 
 
 [2023-04-12] [GraphMAE2](https://arxiv.org/abs/2304.04779) is published and the code can be found [here](https://github.com/THUDM/GraphMAE2).
+
 [2022-12-14] The PYG implementation of **GraphMAE** for node / graph classification is available at this [branch](https://github.com/THUDM/GraphMAE/tree/pyg). 
 
 <h2>Dependencies </h2>
